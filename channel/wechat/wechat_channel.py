@@ -9,7 +9,7 @@ import json
 import os
 import threading
 import time
-
+import re
 import requests
 
 from bridge.context import *
@@ -180,8 +180,26 @@ class WechatChannel(ChatChannel):
     def send(self, reply: Reply, context: Context):
         receiver = context["receiver"]
         if reply.type == ReplyType.TEXT:
-            itchat.send(reply.content, toUserName=receiver)
-            logger.info("[WX] sendMsg={}, receiver={}".format(reply, receiver))
+            # 分割标点符号
+            split_punctuation = ['，', '。', ',', '~', '？']
+            # 需要被保留的标点符号
+            preserved_punctuation = ['~', '？']
+
+            # 创建一个正则表达式模式，用来分割消息
+            pattern = '|'.join(map(re.escape, split_punctuation))
+            # 使用正则表达式来分割消息
+            split_messages = re.split(pattern, reply.content)
+
+            for msg in split_messages:
+                # 移除消息中的标点符号，除了需要被保留的标点符号
+                for punc in split_punctuation:
+                    if punc not in preserved_punctuation:
+                        msg = msg.replace(punc, '')
+                # 发送消息
+                itchat.send(msg, toUserName=receiver)
+                logger.info("[WX] sendMsg={}, receiver={}".format(msg, receiver))
+                # 等待2秒
+                time.sleep(2)
         elif reply.type == ReplyType.ERROR or reply.type == ReplyType.INFO:
             itchat.send(reply.content, toUserName=receiver)
             logger.info("[WX] sendMsg={}, receiver={}".format(reply, receiver))
